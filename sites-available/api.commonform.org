@@ -1,75 +1,85 @@
-limit_req_zone $binary_remote_addr zone=api:10m rate=1r/s;
-
 upstream api {
-        server 127.0.0.1:8080;
-        keepalive 64;
+	server 127.0.0.1:8080;
 }
 
 server {
-        listen 80;
-        server_name api.commonform.org;
-        return 301 https://api.commonform.org$request_uri;
+	listen 80;
+	server_name api.commonform.org;
+	return 301 https://api.commonform.org/$request_uri;
 }
 
 server {
-        listen 443 ssl;
+	listen 443 ssl;
+	
+	server_name api.commonform.org;
 
-        server_name api.commonform.org;
+	ssl_certificate /etc/letsencrypt/live/api.commonform.org/fullchain.pem;
+	ssl_certificate_key /etc/letsencrypt/live/api.commonform.org/privkey.pem;
 
-        ssl_certificate /var/certificates/commonform.pem;
-        ssl_certificate_key /var/certificates/commonform.key;
+	include /etc/nginx/snippets/letsencrypt.conf;
 
-        ssl_session_timeout 1d;
-        ssl_session_cache shared:SSL:50m;
+	ssl_session_timeout 1d;
+	ssl_session_cache shared:SSL:50m;
 
-        ssl_protocols TLSv1.1 TLSv1.2;
-        ssl_ciphers 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!3DES:!MD5:!PSK';
-        ssl_prefer_server_ciphers on;
+	add_header Strict-Transport-Security max-age=15768000;
 
-        location / {
-                limit_req zone=api burst=5;
-                add_header Access-Control-Allow-Origin *;
-                add_header Strict-Transport-Security max-age=15768000;
-                add_header Cache-Control "no-cache, no-store, must-revalidate";
+	ssl_protocols TLSv1.1 TLSv1.2;
+	ssl_ciphers 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!3DES:!MD5:!PSK';
+	ssl_prefer_server_ciphers on;
 
-                gzip on;
-                gzip_comp_level 6;
-                gzip_vary on;
-                gzip_min_length 1000;
-                gzip_proxied any;
-                gzip_types application/json;
-                gzip_buffers 16 8k;
+	location / {
+		add_header Strict-Transport-Security max-age=15768000;
+		add_header Cache-Control "no-cache, no-store, must-revalidate";
 
-                proxy_next_upstream error timeout http_502;
-                proxy_pass http://api;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header Host $http_host;
-        }
+		if ($request_method = 'OPTIONS') {
+			add_header 'Access-Control-Allow-Origin' '*';
+			add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
+			add_header 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type';
+			add_header 'Access-Control-Expose-Headers' 'Location';
+			add_header 'Content-Type' 'text/plain';
+			add_header 'Content-Length' 0;
+			return 204;
+		}
+
+		if ($request_method = 'POST') {
+			add_header 'Access-Control-Allow-Origin' '*';
+			add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
+			add_header 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type';
+			add_header 'Access-Control-Expose-Headers' 'Location';
+		}
+
+		if ($request_method = 'GET') {
+			add_header 'Access-Control-Allow-Origin' '*';
+			add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
+			add_header 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type';
+		}
+
+		proxy_next_upstream error timeout http_502;
+		proxy_pass http://api;
+		proxy_set_header X-Real-IP $remote_addr;
+		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+		proxy_set_header Host $http_host;
+	}
 
 
-        location ~ "/forms/[a-f0-9]{64}$" {
-                add_header Access-Control-Allow-Origin *;
-                add_header Strict-Transport-Security max-age=15768000;
-                add_header Cache-Control "max-age=31556926";
+	location ~ "/forms/[a-f0-9]{64}$" {
+		add_header Access-Control-Allow-Origin *;
+		add_header Strict-Transport-Security max-age=15768000;
+		add_header Cache-Control "max-age=31556926";
 
-                gzip on;
-                gzip_comp_level 6;
-                gzip_vary on;
-                gzip_min_length 1000;
-                gzip_proxied any;
-                gzip_types application/json;
-                gzip_buffers 16 8k;
+		gzip on;
+		gzip_comp_level 6;
+		gzip_vary on;
+		gzip_min_length 1000;
+		gzip_proxied any;
+		gzip_types application/json;
+		gzip_buffers 16 8k;
 
-                proxy_next_upstream error timeout http_502;
-                proxy_pass http://api;
-                proxy_set_header X-Real-IP $remote_addr;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                proxy_set_header Host $http_host;
-        }
+		proxy_next_upstream error timeout http_502;
+		proxy_pass http://api;
+		proxy_set_header X-Real-IP $remote_addr;
+		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+		proxy_set_header Host $http_host;
+	}
 
-        location /callbacks {
-          deny all;
-          return 403;
-        }
 }
